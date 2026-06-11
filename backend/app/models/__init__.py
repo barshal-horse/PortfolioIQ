@@ -58,3 +58,4 @@ from app.models.price_history import (  # noqa: E402, F401
 )
 from app.models.risk_metrics import RiskMetrics  # noqa: E402, F401
 from app.models.benchmark_comparison import BenchmarkComparison  # noqa: E402, F401
+from app.models.health_score import HealthScore  # noqa: E402, F401

@@ -102,10 +102,25 @@ Scope:
 
 ---
 
-## Phase 6 — Portfolio Health Score ⏳
+## Phase 6 — Portfolio Health Score ✅
+
+**Status**: Complete  
+**Date**: 2026-06-12
+
+Scope:
+- [x] Database models (`HealthScore` model, registered in `__init__.py`)
+- [x] Alembic migration generation and verification (`d7d491041870_create_health_scores_table.py`)
+- [x] Pydantic schemas (summaries, subscores, categories, recommendations)
+- [x] Implement Portfolio Health Score Service (weighted heuristics, average off-diagonal asset correlation matrix, recommendations prioritization, database caching)
+- [x] API endpoints (`GET /portfolios/{id}/health`, `POST /portfolios/{id}/health/refresh`)
+- [x] Test suite verification (4 new tests, 60 total tests passing)
+
+---
+
 ## Phase 7 — Dashboard ⏳
 ## Phase 8 — Optimization Engine ⏳
 ## Phase 9 — Stress Testing ⏳
 ## Phase 10 — AI Copilot ⏳
 ## Phase 11 — News Intelligence ⏳
 ## Phase 12 — Reporting Engine ⏳
+
