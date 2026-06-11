@@ -85,7 +85,23 @@ Scope:
 
 ---
 
-## Phase 5 — Benchmark Engine ⏳
+## Phase 5 — Benchmark Engine ✅
+
+**Status**: Complete  
+**Date**: 2026-06-12
+
+Scope:
+- [x] Database models (BenchmarkComparison)
+- [x] Alembic migration generation and verification (`08c8ab56c54d_create_benchmark_comparisons_table.py`)
+- [x] Pydantic schemas (ComparisonSeries, PeriodReturnItem, PeriodReturns, BenchmarkMetrics, BenchmarkComparisonResponse)
+- [x] Implement Benchmark Engine Service (active return, tracking error, information ratio, Alpha/Beta calculation, upside/downside capture ratios)
+- [x] Rolling stats calculation (60-day rolling Alpha, rolling Beta, rolling Correlation series)
+- [x] Cumulative comparison growth index and specific period return calculations (1m, 3m, 6m, 1y, YTD)
+- [x] API endpoints (`GET /api/v1/portfolios/{id}/benchmark`)
+- [x] Test suite verification (2 new tests, 56 total tests passing)
+
+---
+
 ## Phase 6 — Portfolio Health Score ⏳
 ## Phase 7 — Dashboard ⏳
 ## Phase 8 — Optimization Engine ⏳
