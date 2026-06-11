@@ -1,0 +1,71 @@
+[project]
+name = "portfolioiq-backend"
+version = "0.1.0"
+description = "PortfolioIQ - Institutional-Grade AI Portfolio Analyzer & Optimizer"
+requires-python = ">=3.11"
+dependencies = [
+    # Web framework
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.9",
+
+    # Database
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
+
+    # Validation
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "email-validator>=2.0.0",
+
+    # Auth
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+
+    # Data processing
+    "pandas>=2.0.0",
+    "numpy>=1.26.0",
+
+    # HTTP client
+    "httpx>=0.27.0",
+
+    # Rate limiting
+    "slowapi>=0.1.9",
+
+    # Scheduling
+    "apscheduler>=3.10.0",
+
+    # Market Data
+    "yfinance>=0.2.38",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.27.0",
+    "aiosqlite>=0.20.0",
+    "ruff>=0.3.0",
+]
+
+# Later phases will add:
+# market-data: yfinance, alpha-vantage
+# analytics: scipy, pyportfolioopt, cvxpy
+# ai: langgraph, langchain-core, google-genai, qdrant-client
+# reporting: reportlab
+# news: (httpx already included)
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]

@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: portfolioiq-db
+    environment:
+      POSTGRES_USER: portfolioiq
+      POSTGRES_PASSWORD: portfolioiq_pass
+      POSTGRES_DB: portfolioiq
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portfolioiq"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Qdrant will be added in Phase 10 (AI Copilot)
+  # qdrant:
+  #   image: qdrant/qdrant:v1.8.0
+  #   ports:
+  #     - "6333:6333"
+  #   volumes:
+  #     - qdrant_data:/qdrant/storage
+
+volumes:
+  pgdata:
