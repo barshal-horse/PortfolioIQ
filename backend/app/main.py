@@ -17,11 +17,11 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     """Application startup and shutdown events."""
     # Startup
-    print(f"🚀 PortfolioIQ backend starting...")
-    print(f"📊 Debug mode: {settings.debug}")
+    print(f"PortfolioIQ backend starting...")
+    print(f"Debug mode: {settings.debug}")
     yield
     # Shutdown
-    print("👋 PortfolioIQ backend shutting down...")
+    print("PortfolioIQ backend shutting down...")
 
 
 app = FastAPI(
