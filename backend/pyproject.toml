@@ -38,6 +38,11 @@ dependencies = [
 
     # Market Data
     "yfinance>=0.2.38",
+
+    # Analytics & Optimization
+    "scipy>=1.12.0",
+    "pyportfolioopt>=1.5.0",
+    "cvxpy>=1.4.0",
 ]
 
 [project.optional-dependencies]

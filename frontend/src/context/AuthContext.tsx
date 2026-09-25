@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api, clearTokens, getAccessToken } from '@/lib/api';
+import { api, clearTokens, getAccessToken, setTokens } from '@/lib/api';
 
 interface User {
   id: string;
@@ -20,12 +20,40 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Test mode: auto-create and login a test user
+const TEST_MODE = process.env.NEXT_PUBLIC_TEST_MODE === 'true';
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     async function loadUser() {
+      if (TEST_MODE) {
+        // Auto-login test user in test mode
+        try {
+          // Try to register first (will fail if exists), then login
+          await api.auth.register({
+            email: 'test@portfolioiq.local',
+            password: 'testpassword123',
+            full_name: 'Test User',
+          });
+        } catch (err) {
+          // User might already exist, ignore
+        }
+        try {
+          const loggedUser = await api.auth.login({
+            email: 'test@portfolioiq.local',
+            password: 'testpassword123',
+          });
+          setUser(loggedUser);
+        } catch (err) {
+          console.error('Test mode login failed:', err);
+        }
+        setLoading(false);
+        return;
+      }
+
       const token = getAccessToken();
       if (token) {
         try {

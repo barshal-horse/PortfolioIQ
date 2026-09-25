@@ -1,6 +1,6 @@
 # PortfolioIQ — Progress Tracker
 
-> Last updated: 2026-06-12
+> Last updated: 2026-09-26
 
 ---
 
@@ -135,8 +135,72 @@ Scope:
 
 ---
 
-## Phase 8 — Optimization Engine ⏳
-## Phase 9 — Stress Testing ⏳
+## Phase 8 — Optimization Engine ✅
+
+**Status**: Complete  
+**Date**: 2026-09-24
+
+Scope:
+- [x] Database models (`OptimizationRun` model, registered in `backend/app/models/__init__.py`)
+- [x] Alembic migration generation and verification (`2c63ac596416_create_optimization_runs_table.py`)
+- [x] Pydantic schemas (`OptimizationConstraints`, `OptimizationRequest`, `BlackLittermanView`, `BlackLittermanRequest`, `TradeRecommendation`, `ExpectedMetrics`, `EfficientFrontierData`, `OptimizationResponseData`, `OptimizationResponse`)
+- [x] Institutional Optimization Engine Service (`backend/app/services/optimization_engine.py`):
+  - [x] Maximum Sharpe Ratio (Tangency portfolio with Ledoit-Wolf shrinkage covariance)
+  - [x] Global Minimum Variance optimization
+  - [x] Mean-Variance quadratic utility optimization
+  - [x] Hierarchical Risk Parity / Equal Risk Contribution (HRP / ERC)
+  - [x] Black-Litterman model with user absolute and relative views, equilibrium priors ($\pi$), and posterior covariance ($\Sigma_{BL}$)
+  - [x] Dynamic Markowitz Efficient Frontier curve generator
+  - [x] Trade rebalancing orders generator with buy/sell/hold actions, deltas, and estimated capital
+  - [x] Allocation constraints support (min/max weights, sector exposure limits)
+- [x] API endpoints (`POST /api/v1/portfolios/{id}/optimize`, `POST /api/v1/portfolios/{id}/optimize/black-litterman`, `GET /api/v1/portfolios/{id}/optimize/history`)
+- [x] Frontend interactive dashboard integration:
+  - [x] TypeScript interfaces in `frontend/src/types/optimization.ts`
+  - [x] API client helper functions in `frontend/src/lib/api.ts`
+  - [x] Optimization navigation tab and dashboard view in `frontend/src/app/page.tsx`
+  - [x] Method selector with parameter sliders (min/max weight constraints)
+  - [x] Black-Litterman interactive view builder (absolute and relative views with confidence slider)
+  - [x] Performance metrics comparison cards (Expected Return, Volatility, Sharpe)
+  - [x] Recharts Markowitz Efficient Frontier scatter/line plot with current vs optimal markers
+  - [x] Current vs Optimal allocation comparative bar chart
+  - [x] Rebalancing trade execution order tickets table
+- [x] Test suite verification (6 new comprehensive tests, 66 total tests passing)
+- [x] Production build validation (`npm run build` passing cleanly)
+
+---
+
+## Phase 9 — Stress Testing ✅
+
+**Status**: Complete  
+**Date**: 2026-09-26
+
+Scope:
+- [x] Database models (`StressTestResult` model, registered in `backend/app/models/__init__.py`)
+- [x] Alembic migration generation and verification (`3e8f7a1b2c4d_create_stress_test_results_table.py`)
+- [x] Pydantic schemas (`ScenarioInfo`, `StressTestRequest`, `HoldingImpact`, `SectorImpact`, `ScenarioResult`, `StressTestResponse`, `StressTestHistoryItem`)
+- [x] Institutional Stress Testing Engine Service (`backend/app/services/stress_testing_engine.py`):
+  - [x] Four historical crisis scenarios (GFC 2008, COVID-19 2020, High Inflation 2022, Rate Shock 2022-23)
+  - [x] Historical price fetching via market data service with scenario-specific date windows
+  - [x] Per-holding return, portfolio-weighted return, max drawdown, and recovery days computation
+  - [x] Sector-level impact aggregation
+  - [x] Executive narrative summary generation
+  - [x] Database persistence with calculation history
+- [x] API endpoints (`POST /api/v1/portfolios/{id}/stress-test`, `GET /api/v1/portfolios/stress-test/scenarios`, `GET /api/v1/portfolios/{id}/stress-test/history`)
+- [x] Frontend interactive dashboard integration:
+  - [x] TypeScript interfaces in `frontend/src/types/stress_test.ts`
+  - [x] API client helper functions in `frontend/src/lib/api.ts`
+  - [x] Stress Testing navigation tab and dashboard view in `frontend/src/app/page.tsx`
+  - [x] Scenario selection cards with visual feedback
+  - [x] Summary cards (Portfolio Return, Max Drawdown, Recovery Days)
+  - [x] Holding Impact Analysis table (scenario, ticker, return, weight, contribution)
+  - [x] Sector Impact Distribution pie chart
+  - [x] Narrative summary per scenario
+  - [x] Stress Test History table with clickable rows
+- [x] Test suite verification (8 new comprehensive tests, 74 total tests passing)
+- [x] Production build validation (`npm run build` passing cleanly)
+
+---
+
 ## Phase 10 — AI Copilot ⏳
 ## Phase 11 — News Intelligence ⏳
 ## Phase 12 — Reporting Engine ⏳

@@ -10,6 +10,8 @@ from app.api.benchmarks import router as benchmarks_router
 from app.api.risk import router as risk_router
 from app.api.benchmark import router as benchmark_comparison_router
 from app.api.health import router as health_router
+from app.api.optimization import router as optimization_router
+from app.api.stress_testing import router as stress_testing_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -21,12 +23,10 @@ api_router.include_router(benchmarks_router)
 api_router.include_router(risk_router)
 api_router.include_router(benchmark_comparison_router)
 api_router.include_router(health_router)
+api_router.include_router(optimization_router)
+api_router.include_router(stress_testing_router)
 
 # Future phases will add:
-# api_router.include_router(risk_router)
-# api_router.include_router(health_score_router)
-# api_router.include_router(optimization_router)
-# api_router.include_router(stress_testing_router)
 # api_router.include_router(copilot_router)
 # api_router.include_router(news_router)
 # api_router.include_router(reports_router)

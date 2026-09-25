@@ -17,22 +17,21 @@ Rules:
 - Use LangGraph for agents
 - Use PyPortfolioOpt for optimization
 
-Implementation Order:
+# Agent Context Boundaries
+- NEVER read, search, or list files inside `node_modules`, `build`, `dist`, or `.git` folders.
+- Do not perform global codebase searches (`grep`) without targeting a specific source directory (like `/src`).
+- Prioritize reading configuration files (like `package.json`, `requirements.txt`, or `go.mod`) to understand architecture before inspecting deep files.
+- If a 429 Rate Limit error occurs, immediately halt execution, log a warning, and wait for the user to prompt a resume.
 
-Phase 1:
-Portfolio Dashboard
-Portfolio Health Score
-Risk Engine
-Benchmark Engine
+# Project Constraints for AI Agents
 
-Phase 2:
-Optimization Engine
-Copilot Agent
+## Exclusions
+- **Dependencies:** Exclude `node_modules/`
+- **Build Artifacts:** Exclude `build/`, `dist/`
 
-Phase 3:
-Stress Testing
-
-Phase 4:
-News Intelligence
+## API Token Management
+- **Target Endpoint:** openrouter/free
+- **Context Cap:** 200,000 tokens maximum.
+- **Request Pacing:** Agent must remain concise to minimize input/output payload bloat.
 
 Always update progress.md.

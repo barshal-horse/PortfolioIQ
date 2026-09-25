@@ -36,20 +36,20 @@ export const clearTokens = () => {
 // Central fetch wrapper with automatic token management & interceptor logic
 async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   // Set default headers
   const headers = new Headers(options.headers || {});
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
-  
+
   const token = getAccessToken();
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  
+
   const response = await fetch(url, { ...options, headers });
-  
+
   // Hande Token Expiration (401 Unauthorized) & Refresh
   if (response.status === 401 && endpoint !== '/auth/login' && endpoint !== '/auth/register') {
     const refreshToken = getRefreshToken();
@@ -60,12 +60,12 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refresh_token: refreshToken })
         });
-        
+
         if (refreshResponse.ok) {
           const refreshData = await refreshResponse.json();
           const newAccessToken = refreshData.data.access_token;
           setTokens(newAccessToken);
-          
+
           // Retry original request with new token
           headers.set('Authorization', `Bearer ${newAccessToken}`);
           const retryResponse = await fetch(url, { ...options, headers });
@@ -84,19 +84,19 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
         throw new Error('Session expired');
       }
     }
-    
+
     clearTokens();
     if (typeof window !== 'undefined') {
       window.location.href = '/auth';
     }
     throw new Error('Unauthorized');
   }
-  
+
   if (!response.ok) {
     const errJson = await response.json().catch(() => ({}));
     throw new Error(errJson.error?.message || `Request failed with status ${response.status}`);
   }
-  
+
   const json = await response.json();
   return json.data as T;
 }
@@ -112,7 +112,7 @@ export const api = {
     },
     me: async () => apiFetch<any>('/auth/me'),
   },
-  
+
   // Portfolios
   portfolios: {
     list: async () => apiFetch<any[]>('/portfolios'),
@@ -126,7 +126,7 @@ export const api = {
       return apiFetch<any>(`/portfolios/${id}/upload-csv`, { method: 'POST', body: formData });
     }
   },
-  
+
   // Holdings
   holdings: {
     add: async (portfolioId: string, body: any) => apiFetch<any>(`/portfolios/${portfolioId}/holdings`, { method: 'POST', body: JSON.stringify(body) }),
@@ -134,7 +134,7 @@ export const api = {
     delete: async (portfolioId: string, holdingId: string) => apiFetch<any>(`/portfolios/${portfolioId}/holdings/${holdingId}`, { method: 'DELETE' }),
     bulk: async (portfolioId: string, holdings: any[], mode: 'merge' | 'replace') => apiFetch<any>(`/portfolios/${portfolioId}/holdings/bulk`, { method: 'POST', body: JSON.stringify({ holdings, mode }) }),
   },
-  
+
   // Market Data
   marketData: {
     getQuote: async (ticker: string) => apiFetch<any>(`/market-data/quote/${ticker}`),
@@ -142,7 +142,7 @@ export const api = {
     getValuation: async (portfolioId: string, period?: string) => apiFetch<any>(`/portfolios/${portfolioId}/valuation?period=${period || '1y'}`),
     getReturns: async (portfolioId: string, period?: string) => apiFetch<any>(`/portfolios/${portfolioId}/returns?period=${period || '1y'}`),
   },
-  
+
   // Risk
   risk: {
     getRisk: async (portfolioId: string, lookback?: number) => apiFetch<any>(`/portfolios/${portfolioId}/risk?lookback_days=${lookback || 252}`),
@@ -151,16 +151,30 @@ export const api = {
     },
     getContributions: async (portfolioId: string) => apiFetch<any>(`/portfolios/${portfolioId}/risk/contributions`),
   },
-  
+
   // Benchmark
   benchmark: {
     getComparison: async (portfolioId: string, lookback?: number) => apiFetch<any>(`/portfolios/${portfolioId}/benchmark?lookback_days=${lookback || 252}`),
     list: async () => apiFetch<any[]>('/benchmarks'),
   },
-  
+
   // Health Score
   health: {
     getHealth: async (portfolioId: string) => apiFetch<any>(`/portfolios/${portfolioId}/health`),
     refresh: async (portfolioId: string) => apiFetch<any>(`/portfolios/${portfolioId}/health/refresh`, { method: 'POST' }),
+  },
+
+  // Stress Testing
+  stress_testing: {
+    runStressTest: async (portfolioId: string, body: any) => apiFetch<any>(`/portfolios/${portfolioId}/stress-test`, { method: 'POST', body: JSON.stringify(body) }),
+    listScenarios: async () => apiFetch<any[]>('/stress-test/scenarios'),
+    getHistory: async (portfolioId: string, limit?: number) => apiFetch<any[]>(`/portfolios/${portfolioId}/stress-test/history?limit=${limit || 20}`),
+  },
+
+  // Optimization
+  optimization: {
+    optimize: async (portfolioId: string, body: any) => apiFetch<any>(`/portfolios/${portfolioId}/optimize`, { method: 'POST', body: JSON.stringify(body) }),
+    optimizeBlackLitterman: async (portfolioId: string, body: any) => apiFetch<any>(`/portfolios/${portfolioId}/optimize/black-litterman`, { method: 'POST', body: JSON.stringify(body) }),
+    getHistory: async (portfolioId: string, limit?: number) => apiFetch<any[]>(`/portfolios/${portfolioId}/optimize/history?limit=${limit || 10}`),
   }
 };

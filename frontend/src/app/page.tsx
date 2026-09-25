@@ -23,7 +23,13 @@ import {
   RefreshCw,
   Info,
   ChevronRight,
-  TrendingDown
+  TrendingDown,
+  ShieldAlert,
+  Sliders,
+  Target,
+  Sparkles,
+  ArrowUpRight,
+  ArrowDownRight
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -48,7 +54,7 @@ export default function DashboardPage() {
   const router = useRouter();
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'overview' | 'risk' | 'benchmark' | 'health'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'risk' | 'benchmark' | 'health' | 'optimization' | 'stress_testing'>('overview');
 
   // Portfolio State
   const [portfolios, setPortfolios] = useState<any[]>([]);
@@ -62,6 +68,16 @@ export default function DashboardPage() {
   const [varDetails, setVarDetails] = useState<any>(null);
   const [benchmarkData, setBenchmarkData] = useState<any>(null);
   const [healthData, setHealthData] = useState<any>(null);
+  
+  // Stress Testing States
+  const [stressScenarios, setStressScenarios] = useState<any[]>([]);
+  const [selectedScenarioIds, setSelectedScenarioIds] = useState<string[]>([]);
+  const [stressResults, setStressResults] = useState<any[]>([]);
+  const [selectedStressResultId, setSelectedStressResultId] = useState<string>('');
+  const [stressHistory, setStressHistory] = useState<any[]>([]);
+  const [stressLoading, setStressLoading] = useState<boolean>(false);
+  const [scenariosLoading, setScenariosLoading] = useState<boolean>(false);
+  const [stressError, setStressError] = useState<string | null>(null);
   
   // Loading states
   const [portfoliosLoading, setPortfoliosLoading] = useState(true);
@@ -119,6 +135,20 @@ export default function DashboardPage() {
       setHealthData(null);
     }
   }, [selectedPortfolioId, lookback]);
+
+  // Load stress testing scenarios when stress testing tab is active
+  useEffect(() => {
+    if (activeTab === 'stress_testing') {
+      loadStressScenarios();
+    }
+  }, [activeTab]);
+
+  // Load stress testing history when portfolio changes
+  useEffect(() => {
+    if (selectedPortfolioId && activeTab === 'stress_testing') {
+      loadStressHistory(selectedPortfolioId);
+    }
+  }, [selectedPortfolioId, activeTab]);
 
   const loadPortfolios = async () => {
     setPortfoliosLoading(true);
@@ -235,6 +265,56 @@ export default function DashboardPage() {
       }
     } catch (err) {
       alert('Error deleting portfolio');
+    }
+  };
+
+  const handleRunStressTest = async () => {
+    if (!selectedPortfolioId || selectedScenarioIds.length === 0) {
+      return;
+    }
+    setStressLoading(true);
+    setStressError(null);
+    try {
+      const res = await api.stress_testing.runStressTest(
+        selectedPortfolioId,
+        {
+          scenarios: selectedScenarioIds,
+        },
+      );
+      setStressResults(res.scenarios);
+    } catch (err: any) {
+      setStressError(err.message || 'Stress test failed');
+    } finally {
+      setStressLoading(false);
+    }
+  };
+
+  const handleClearStressResults = () => {
+    setStressResults([]);
+    setSelectedScenarioIds([]);
+  };
+
+  const loadStressScenarios = async () => {
+    setScenariosLoading(true);
+    try {
+      const scenarios = await api.stress_testing.listScenarios();
+      setStressScenarios(scenarios);
+      setScenariosLoading(false);
+    } catch (err: any) {
+      setStressError(err.message || 'Failed to load scenarios');
+      setScenariosLoading(false);
+    }
+  };
+
+  const loadStressHistory = async (portfolioId: string) => {
+    setStressLoading(true);
+    try {
+      const history = await api.stress_testing.getHistory(portfolioId, 20);
+      setStressHistory(history);
+      setStressLoading(false);
+    } catch (err: any) {
+      setStressError(err.message || 'Failed to load history');
+      setStressLoading(false);
     }
   };
 
@@ -1031,6 +1111,288 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
+          {/* ── STRESS TESTING PANEL ─────────────────────────────────────────── */}
+          {activeTab === 'stress_testing' && selectedPortfolioId && (
+            <div className="space-y-8">
+              {/* Stress Testing Controls */}
+              <div className="glass-card rounded-2xl p-6 border border-brand-border">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-100 mb-2">Stress Testing Scenarios</h3>
+                    <p className="text-sm text-slate-400">Select historical crisis scenarios to simulate portfolio impact</p>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    {scenariosLoading ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="h-4 w-4 border-2 border-brand-cyan border-t-transparent rounded-full animate-spin" />
+                        <span className="text-sm text-slate-400">Loading scenarios...</span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-slate-500">
+                        {stressScenarios.length} scenarios available
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Scenario Selection */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                  {stressScenarios.map((scenario) => (
+                    <div
+                      key={scenario.id}
+                      onClick={() => {
+                        setSelectedScenarioIds(prev =>
+                          prev.includes(scenario.id)
+                            ? prev.filter(id => id !== scenario.id)
+                            : [...prev, scenario.id]
+                        );
+                      }}
+                      className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedScenarioIds.includes(scenario.id)
+                        ? 'border-brand-cyan bg-brand-cyan/10'
+                        : 'border-brand-border hover:border-brand-cyan/50 hover:bg-brand-card/50'
+                        }`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <ShieldAlert className="h-5 w-5 text-brand-cyan" />
+                        <div className={`px-2 py-1 rounded-lg text-xs font-semibold ${selectedScenarioIds.includes(scenario.id)
+                          ? 'bg-brand-cyan/20 text-brand-cyan'
+                          : 'bg-slate-700/50 text-slate-400'
+                          }`}>
+                          {selectedScenarioIds.includes(scenario.id) ? 'SELECTED' : 'AVAILABLE'}
+                        </div>
+                      </div>
+                      <h4 className="font-semibold text-slate-100 text-sm mb-1">{scenario.name}</h4>
+                      <p className="text-xs text-slate-400 mb-2">{scenario.description}</p>
+                      <div className="text-xs text-slate-500">
+                        <div>Period: {scenario.start_date} to {scenario.end_date}</div>
+                        <div>SP500 Return: {(scenario.sp500_return * 100).toFixed(1)}%</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Stress Test Actions */}
+                <div className="flex items-center justify-between pt-4 border-t border-brand-border">
+                  <div className="text-sm text-slate-400">
+                    {selectedScenarioIds.length > 0
+                      ? `${selectedScenarioIds.length} scenario(s) selected`
+                      : 'No scenarios selected'}
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={handleClearStressResults}
+                      disabled={stressLoading || selectedScenarioIds.length === 0}
+                      className="px-4 py-2 border border-brand-border hover:bg-brand-card rounded-xl text-sm font-semibold text-slate-300 hover:text-slate-100 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Clear Results
+                    </button>
+                    <button
+                      onClick={handleRunStressTest}
+                      disabled={stressLoading || selectedScenarioIds.length === 0}
+                      className="bg-brand-cyan/15 hover:bg-brand-cyan/25 text-brand-cyan border border-brand-cyan/30 rounded-xl px-4 py-2 text-sm font-semibold flex items-center cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {stressLoading ? (
+                        <>
+                          <div className="h-4 w-4 border-2 border-brand-cyan border-t-transparent rounded-full animate-spin mr-2" />
+                          Running...
+                        </>
+                      ) : (
+                        <>
+                          <ShieldAlert className="h-4 w-4 mr-2" />
+                          Run Stress Test
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Error Display */}
+                {stressError && (
+                  <div className="mt-4 p-3 bg-brand-red/10 border border-brand-red/25 rounded-lg text-brand-red text-sm">
+                    {stressError}
+                  </div>
+                )}
+              </div>
+
+              {/* Stress Test Results */}
+              {stressResults.length > 0 && (
+                <div className="space-y-6">
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {stressResults.map((result) => (
+                      <div key={result.scenario} className="glass-card rounded-2xl p-6 border border-brand-border">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-base font-bold text-slate-100">{result.scenario}</h4>
+                          <div className="px-2 py-1 rounded-lg bg-brand-cyan/15 text-brand-cyan text-xs font-semibold">
+                            {result.scenario_start} - {result.scenario_end}
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <div>
+                            <div className="text-xs text-slate-400 uppercase mb-1">Portfolio Return</div>
+                            <div className={`text-2xl font-bold font-mono ${result.portfolio_return >= 0 ? 'text-brand-green' : 'text-brand-red'}`}>
+                              {(result.portfolio_return * 100).toFixed(2)}%
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-slate-400 uppercase mb-1">Maximum Drawdown</div>
+                            <div className="text-2xl font-bold font-mono text-brand-red">
+                              {(result.max_drawdown * 100).toFixed(2)}%
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-slate-400 uppercase mb-1">Recovery Days</div>
+                            <div className="text-2xl font-bold font-mono text-brand-cyan">
+                              {result.recovery_days || 'N/A'}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-brand-border">
+                          <p className="text-sm text-slate-300 line-clamp-2">
+                            {result.summary}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Holding Impact Table */}
+                  {stressResults.length > 0 && stressResults[0].holding_impacts.length > 0 && (
+                    <div className="glass-card rounded-2xl border border-brand-border overflow-hidden">
+                      <div className="px-6 py-5 border-b border-brand-border">
+                        <h4 className="text-base font-bold text-slate-100">Holding Impact Analysis</h4>
+                        <p className="text-xs text-slate-400 mt-0.5">Per-holding return contribution by scenario</p>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                          <thead>
+                            <tr className="bg-brand-bg/60 border-b border-brand-border text-slate-400 text-xs font-semibold uppercase">
+                              <th className="px-6 py-3.5">Scenario</th>
+                              <th className="px-6 py-3.5">Ticker</th>
+                              <th className="px-6 py-3.5">Return</th>
+                              <th className="px-6 py-3.5">Weight</th>
+                              <th className="px-6 py-3.5">Contribution</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-brand-border">
+{stressResults.flatMap((result) =>
+              result.holding_impacts.map((impact: any) => (
+                                <tr key={`${result.scenario}-${impact.ticker}`} className="hover:bg-brand-card/25 transition-colors">
+                                  <td className="px-6 py-4 font-semibold text-brand-cyan">{result.scenario}</td>
+                                  <td className="px-6 py-4 font-bold text-slate-100">{impact.ticker}</td>
+                                  <td className="px-6 py-4 font-mono text-slate-300">{(impact.return * 100).toFixed(2)}%</td>
+                                  <td className="px-6 py-4 font-mono text-slate-300">{(impact.weight * 100).toFixed(2)}%</td>
+                                  <td className="px-6 py-4 font-mono font-semibold text-slate-100">{(impact.contribution * 100).toFixed(2)}%</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sector Impact Chart */}
+                  {stressResults.length > 0 && stressResults[0].sector_impacts.length > 0 && (
+                    <div className="glass-card rounded-2xl p-6 border border-brand-border">
+                      <h4 className="text-base font-bold text-slate-100 mb-4">Sector Impact Distribution</h4>
+                      <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsPieChart>
+                            <Pie
+                              data={stressResults.flatMap((result) =>
+                                result.sector_impacts.map((impact: any) => ({
+                                  name: `${result.scenario}: ${impact.sector}`,
+                                  value: impact.contribution,
+                                }))
+                              )}
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={100}
+                              fill="#8884d8"
+                              dataKey="value"
+                              label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(1)}%)`}
+                              labelLine={false}
+                            >
+{stressResults.flatMap((result) =>
+                result.sector_impacts.map((impact: any, index: number) => {
+                                  const colors = ['#06B6D4', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#3B82F6', '#84CC16'];
+                                  return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                                })
+                              )}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: '#0a101d',
+                                borderColor: '#23354d',
+                                borderRadius: '12px',
+                                fontSize: '12px',
+                              }}
+                              formatter={(value: any) => [`${(value * 100).toFixed(2)}%`, 'Contribution']}
+                            />
+                          </RechartsPieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Narrative Summary */}
+                  {stressResults.map((result) => (
+                    <div key={result.scenario} className="glass-card rounded-2xl p-6 border border-brand-border">
+                      <h4 className="text-base font-bold text-slate-100 mb-3">Narrative Summary: {result.scenario}</h4>
+                      <p className="text-sm text-slate-300 leading-relaxed">
+                        {result.summary}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* History Section */}
+              {stressHistory.length > 0 && (
+                <div className="glass-card rounded-2xl border border-brand-border overflow-hidden">
+                  <div className="px-6 py-5 border-b border-brand-border">
+                    <h4 className="text-base font-bold text-slate-100">Stress Test History</h4>
+                    <p className="text-xs text-slate-400 mt-0.5">Previous stress test runs and results</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="bg-brand-bg/60 border-b border-brand-border text-slate-400 text-xs font-semibold uppercase">
+                          <th className="px-6 py-3.5">Date</th>
+                          <th className="px-6 py-3.5">Scenario</th>
+                          <th className="px-6 py-3.5">Portfolio Return</th>
+                          <th className="px-6 py-3.5">Max Drawdown</th>
+                          <th className="px-6 py-3.5">Recovery Days</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-brand-border">
+                        {stressHistory.map((item) => (
+                          <tr key={item.id} className="hover:bg-brand-card/25 transition-colors"
+                            onClick={() => setSelectedStressResultId(item.id)}
+                          >
+                            <td className="px-6 py-4 font-mono text-slate-300">
+                              {item.calculation_date ? new Date(item.calculation_date).toLocaleDateString() : 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 font-semibold text-brand-cyan">{item.scenario}</td>
+                            <td className="px-6 py-4 font-mono text-slate-300">
+                              {item.portfolio_return ? `${(item.portfolio_return * 100).toFixed(2)}%` : 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 font-mono text-brand-red">
+                              {item.max_drawdown ? `${(item.max_drawdown * 100).toFixed(2)}%` : 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 font-mono text-slate-300">
+                              {item.recovery_days || 'N/A'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           </div>
         )}
       </main>
