@@ -50,7 +50,13 @@ class AlpacaService:
                     detail=f"Alpaca unreachable: {e}",
                 )
         if resp.status_code in (401, 403):
-            raise HTTPException(status_code=401, detail="Alpaca rejected the API credentials")
+            # 502, not 401: a downstream credential rejection must not be
+            # mistaken by clients for an expired *user* session (the frontend
+            # logs out on any 401).
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Alpaca rejected the API credentials — check your API Key ID and Secret Key",
+            )
         if resp.status_code == 404:
             raise HTTPException(status_code=404, detail="Alpaca resource not found")
         if resp.status_code >= 400:

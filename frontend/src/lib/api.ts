@@ -94,7 +94,12 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
 
   if (!response.ok) {
     const errJson = await response.json().catch(() => ({}));
-    throw new Error(errJson.error?.message || `Request failed with status ${response.status}`);
+    // FastAPI raises HTTPException(detail=...) → {detail: "..."}
+    const errMsg =
+      errJson.error?.message ||
+      errJson.detail ||
+      `Request failed with status ${response.status}`;
+    throw new Error(errMsg);
   }
 
   const json = await response.json();
