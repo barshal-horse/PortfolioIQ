@@ -147,15 +147,16 @@ async def test_get_history_caches_prices_in_db(
 
 
 @pytest.mark.asyncio
-async def test_get_exchange_rate_fallback(db_session: AsyncSession):
-    """Verify fallback and persistence of exchange rates."""
+@patch("app.services.market_data_service._fetch_rate_from_provider", return_value=None)
+async def test_get_exchange_rate_fallback(mock_provider, db_session: AsyncSession):
+    """Verify fallback constants are used when the live provider is unavailable."""
     rate_date = datetime.date(2024, 1, 15)
 
     # 1. Fetching same currency returns 1.0
     rate_same = await market_data_service.get_exchange_rate(db_session, "USD", "USD", rate_date)
     assert rate_same == 1.0
 
-    # 2. Check fallback to CURRENCY_FALLBACKS constants
+    # 2. Provider unavailable -> falls back to CURRENCY_FALLBACKS constants
     rate_conv = await market_data_service.get_exchange_rate(db_session, "USD", "INR", rate_date)
     assert rate_conv == 83.50
 

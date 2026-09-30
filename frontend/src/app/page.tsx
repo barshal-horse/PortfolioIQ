@@ -4,6 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import CopilotSidebar from '@/components/CopilotSidebar';
+import NewsTab from '@/components/NewsTab';
+import ReportsTab from '@/components/ReportsTab';
+import OptimizationPanel from '@/components/OptimizationPanel';
+import AddHoldingModal from '@/components/AddHoldingModal';
+import BrokerSyncCard from '@/components/BrokerSyncCard';
 import {
   LayoutDashboard,
   TrendingUp,
@@ -29,7 +35,10 @@ import {
   Target,
   Sparkles,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Newspaper,
+  FileText,
+  X
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -54,7 +63,10 @@ export default function DashboardPage() {
   const router = useRouter();
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'overview' | 'risk' | 'benchmark' | 'health' | 'optimization' | 'stress_testing'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'risk' | 'benchmark' | 'health' | 'optimization' | 'stress_testing' | 'news' | 'reports'>('overview');
+
+  // Copilot Sidebar State
+  const [copilotOpen, setCopilotOpen] = useState(false);
 
   // Portfolio State
   const [portfolios, setPortfolios] = useState<any[]>([]);
@@ -226,6 +238,25 @@ export default function DashboardPage() {
         ticker: newHoldingTicker.toUpperCase(),
         quantity: parseFloat(newHoldingQty),
         average_cost: parseFloat(newHoldingCost),
+        currency: 'USD'
+      });
+      setNewHoldingTicker('');
+      setNewHoldingQty('');
+      setNewHoldingCost('');
+      setIsAddHoldingModalOpen(false);
+      loadAllPortfolioAnalytics(selectedPortfolioId, lookback);
+    } catch (err) {
+      alert('Error adding holding. Verify that ticker is correct.');
+    }
+  };
+
+  // Used by the AddHoldingModal component (autocomplete + price fetch)
+  const handleAddHoldingFromModal = async (ticker: string, qty: string, cost: string) => {
+    try {
+      await api.holdings.add(selectedPortfolioId, {
+        ticker: ticker.toUpperCase(),
+        quantity: parseFloat(qty),
+        average_cost: parseFloat(cost),
         currency: 'USD'
       });
       setNewHoldingTicker('');
@@ -439,6 +470,54 @@ export default function DashboardPage() {
             <HeartPulse className="h-5 w-5 mr-3" />
             Health Score
           </button>
+
+          <button
+            onClick={() => setActiveTab('optimization')}
+            className={`w-full flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === 'optimization'
+                ? 'bg-brand-cyan/10 text-brand-cyan border-l-4 border-brand-cyan'
+                : 'text-slate-400 hover:bg-brand-card/50 hover:text-slate-200'
+            }`}
+          >
+            <Target className="h-5 w-5 mr-3" />
+            Optimization
+          </button>
+
+          <button
+            onClick={() => setActiveTab('stress_testing')}
+            className={`w-full flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === 'stress_testing'
+                ? 'bg-brand-cyan/10 text-brand-cyan border-l-4 border-brand-cyan'
+                : 'text-slate-400 hover:bg-brand-card/50 hover:text-slate-200'
+            }`}
+          >
+            <ShieldAlert className="h-5 w-5 mr-3" />
+            Stress Testing
+          </button>
+
+          <button
+            onClick={() => setActiveTab('news')}
+            className={`w-full flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === 'news'
+                ? 'bg-brand-cyan/10 text-brand-cyan border-l-4 border-brand-cyan'
+                : 'text-slate-400 hover:bg-brand-card/50 hover:text-slate-200'
+            }`}
+          >
+            <Newspaper className="h-5 w-5 mr-3" />
+            News Intelligence
+          </button>
+
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`w-full flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === 'reports'
+                ? 'bg-brand-cyan/10 text-brand-cyan border-l-4 border-brand-cyan'
+                : 'text-slate-400 hover:bg-brand-card/50 hover:text-slate-200'
+            }`}
+          >
+            <FileText className="h-5 w-5 mr-3" />
+            Reports
+          </button>
         </nav>
 
         {/* User Info / Log Out */}
@@ -521,6 +600,23 @@ export default function DashboardPage() {
                 </button>
               </>
             )}
+
+            <button
+              onClick={() => setCopilotOpen((open) => !open)}
+              className={`flex items-center rounded-xl px-4 py-2 text-sm font-semibold transition-all cursor-pointer ${
+                copilotOpen
+                  ? 'bg-gradient-to-r from-brand-cyan to-brand-violet text-slate-100 shadow-lg shadow-brand-cyan/20'
+                  : 'bg-brand-card border border-brand-violet/40 text-brand-violet hover:bg-brand-violet/10'
+              }`}
+              title="AI Copilot"
+            >
+              {copilotOpen ? (
+                <X className="h-4.5 w-4.5 mr-1.5" />
+              ) : (
+                <Sparkles className="h-4.5 w-4.5 mr-1.5" />
+              )}
+              AI Copilot
+            </button>
           </div>
         </header>
 
@@ -602,6 +698,11 @@ export default function DashboardPage() {
             {/* TAB OVERVIEW PANEL */}
             {activeTab === 'overview' && (
               <div className="space-y-8">
+                {/* Broker Sync */}
+                <BrokerSyncCard
+                  portfolioId={selectedPortfolioId}
+                  onSynced={() => loadAllPortfolioAnalytics(selectedPortfolioId, lookback)}
+                />
                 {/* Metrics Summary Card Row */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="glass-card rounded-2xl p-6 border border-brand-border flex items-center justify-between">
@@ -1111,6 +1212,21 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
+          {/* ── NEWS INTELLIGENCE PANEL ──────────────────────────────────── */}
+          {activeTab === 'news' && selectedPortfolioId && (
+            <NewsTab portfolioId={selectedPortfolioId} />
+          )}
+
+          {/* ── REPORTS PANEL ────────────────────────────────────────────── */}
+          {activeTab === 'reports' && selectedPortfolioId && (
+            <ReportsTab portfolioId={selectedPortfolioId} />
+          )}
+
+          {/* ── OPTIMIZATION PANEL (Phase 8 — quick run UI) ────────────── */}
+          {activeTab === 'optimization' && selectedPortfolioId && (
+            <OptimizationPanel portfolioId={selectedPortfolioId} />
+          )}
+
           {/* ── STRESS TESTING PANEL ─────────────────────────────────────────── */}
           {activeTab === 'stress_testing' && selectedPortfolioId && (
             <div className="space-y-8">
@@ -1397,6 +1513,14 @@ export default function DashboardPage() {
         )}
       </main>
 
+      {/* ── AI COPILOT SIDEBAR ─────────────────────────────────────────── */}
+      {copilotOpen && selectedPortfolioId && (
+        <CopilotSidebar
+          portfolioId={selectedPortfolioId}
+          onClose={() => setCopilotOpen(false)}
+        />
+      )}
+
       {/* ── MODAL CREATE PORTFOLIO ────────────────────────────────────────── */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 bg-brand-bg/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1458,69 +1582,12 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── MODAL ADD HOLDING MANUALLY ─────────────────────────────────────── */}
+      {/* ── MODAL ADD HOLDING (with ticker autocomplete + price fetch) ── */}
       {isAddHoldingModalOpen && (
-        <div className="fixed inset-0 bg-brand-bg/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass-card rounded-2xl p-8 border border-brand-border w-full max-w-md shadow-2xl relative">
-            <h3 className="text-lg font-bold text-slate-100 mb-6">Add Asset Holding</h3>
-            <form onSubmit={handleAddHolding} className="space-y-4">
-              <div>
-                <label className="block text-slate-400 text-xs font-semibold uppercase mb-1.5">Ticker symbol</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g., AAPL"
-                  value={newHoldingTicker}
-                  onChange={(e) => setNewHoldingTicker(e.target.value)}
-                  className="w-full bg-brand-bg/60 border border-brand-border rounded-lg py-2 px-3 focus:outline-none focus:border-brand-cyan text-slate-100 text-sm"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-400 text-xs font-semibold uppercase mb-1.5">Quantity</label>
-                  <input
-                    type="number"
-                    required
-                    step="any"
-                    placeholder="0.00"
-                    value={newHoldingQty}
-                    onChange={(e) => setNewHoldingQty(e.target.value)}
-                    className="w-full bg-brand-bg/60 border border-brand-border rounded-lg py-2 px-3 focus:outline-none focus:border-brand-cyan text-slate-100 text-sm font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 text-xs font-semibold uppercase mb-1.5">Average Cost</label>
-                  <input
-                    type="number"
-                    required
-                    step="any"
-                    placeholder="0.00"
-                    value={newHoldingCost}
-                    onChange={(e) => setNewHoldingCost(e.target.value)}
-                    className="w-full bg-brand-bg/60 border border-brand-border rounded-lg py-2 px-3 focus:outline-none focus:border-brand-cyan text-slate-100 text-sm font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setIsAddHoldingModalOpen(false)}
-                  className="px-4 py-2 border border-brand-border hover:bg-brand-card rounded-lg text-sm text-slate-400 hover:text-slate-200 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-brand-cyan hover:bg-brand-cyan/90 text-brand-bg font-semibold rounded-lg text-sm cursor-pointer"
-                >
-                  Add holding
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <AddHoldingModal
+          onSubmit={(tkr, qty, cost) => handleAddHoldingFromModal(tkr, qty, cost)}
+          onClose={() => setIsAddHoldingModalOpen(false)}
+        />
       )}
 
       {/* ── MODAL UPLOAD CSV ─────────────────────────────────────────────── */}

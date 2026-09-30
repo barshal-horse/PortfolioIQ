@@ -22,6 +22,7 @@ from app.schemas.risk import (
 )
 from app.services import market_data_service
 from app.utils.constants import BENCHMARK_TICKERS, BenchmarkType
+from app.utils.ids import to_uuid as _to_uuid
 
 
 def get_period_from_lookback(lookback_days: int) -> str:
@@ -47,6 +48,9 @@ async def calculate_portfolio_risk(
     rf_override: float | None = None,
 ) -> RiskResponse:
     """Calculate and cache all statistical risk metrics for a portfolio."""
+    portfolio_id = _to_uuid(portfolio_id)
+    user_id = _to_uuid(user_id)
+
     # 1. Fetch portfolio details
     result = await db.execute(
         select(Portfolio).where(
@@ -320,6 +324,9 @@ async def calculate_var_details(
     horizon_days: int = 1,
 ) -> VaRResponse:
     """Calculate detailed tail risks (Value at Risk and Conditional VaR)."""
+    portfolio_id = _to_uuid(portfolio_id)
+    user_id = _to_uuid(user_id)
+
     # 1. Fetch portfolio details
     result = await db.execute(
         select(Portfolio).where(
@@ -442,6 +449,9 @@ async def calculate_risk_contributions(
     db: AsyncSession, portfolio_id: str, user_id: str
 ) -> RiskContributionsResponse:
     """Decompose portfolio risk into constituent holding contributions (Euler risk decomposition)."""
+    portfolio_id = _to_uuid(portfolio_id)
+    user_id = _to_uuid(user_id)
+
     # 1. Fetch portfolio and holdings
     result = await db.execute(
         select(Portfolio)

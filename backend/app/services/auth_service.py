@@ -82,11 +82,39 @@ async def register_user(db: AsyncSession, data: UserRegister) -> User:
             detail="A user with this email already exists",
         )
 
+    # Derive a friendly display name from the email when not provided
+    full_name = (data.full_name or data.email.split("@")[0].replace(".", " ").replace("_", " ").title())[:255]
+
     user = User(
         email=data.email,
         hashed_password=hash_password(data.password),
-        full_name=data.full_name,
+        full_name=full_name,
         base_currency=data.base_currency,
+    )
+    db.add(user)
+    await db.flush()
+    await db.refresh(user)
+    return user
+
+
+async def upsert_google_user(
+    db: AsyncSession, firebase_uid: str, email: str, display_name: str | None
+) -> User:
+    """Find or create the user for a verified Google/Firebase identity."""
+    import uuid as _uuid
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user:
+        return user
+
+    full_name = (display_name or email.split("@")[0].replace(".", " ").replace("_", " ").title())[:255]
+    # No password for OAuth-only users; random unguessable hash placeholder.
+    user = User(
+        email=email,
+        hashed_password=hash_password(_uuid.uuid4().hex + firebase_uid),
+        full_name=full_name,
+        base_currency="USD",
     )
     db.add(user)
     await db.flush()

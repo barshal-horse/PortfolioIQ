@@ -1,6 +1,49 @@
 # PortfolioIQ — Progress Tracker
 
-> Last updated: 2026-09-26
+> Last updated: 2026-09-30
+
+---
+
+## Remediation & Completion Round (2026-09-30) ✅
+
+**Status**: Complete
+
+A full audit found that Phases 10–12 were broken at runtime despite being marked complete.
+All issues were fixed and verified with a 25-check end-to-end API smoke test (ALL PASS)
+and the 74-test backend suite (74 passed).
+
+### Runtime bugs fixed
+- Reporting engine: removed invalid `await` on sync `_build_report` — **no PDF could ever generate before**
+- Copilot tools: fixed 5 calls to non-existent service functions (real names wired: `calculate_risk_contributions`, `calculate_portfolio_health`, `run_optimization`, `get_portfolio_returns_series`, `calculate_benchmark_comparison`)
+- Copilot router: LLM could route to 6 phantom agents not in the graph → registry now matches the actual LangGraph
+- Copilot streaming: was hardcoding a placeholder `user_id` and dropping `portfolio_id` — real context now flows through
+- News scheduler: missing `select`/`NewsArticle` imports (2 of 3 jobs crashed) and was never started — now started in app lifespan (disable with `DISABLE_NEWS_SCHEDULER=true`)
+- News refresh API: passed `db` as `portfolio_id` — signature mismatch crash
+- Sentiment `analyze_batch`: fixed self-appending infinite loop; Gemini calls moved off the event loop via `asyncio.to_thread`
+- Env plumbing: API keys in `.env` were invisible to `os.getenv()` reads — all AI/news keys now load via pydantic settings
+- Cross-cutting: `str`→`uuid.UUID` coercion at all service entry points (`app/utils/ids.py`) — fixed 500s on risk/benchmark/health/news on the live server
+- `health_service`: eager-load `Holding.instrument` (async lazy-load crash)
+- `market_data_service`: missing `timedelta` import broke both the DB cache path and FX fallback path
+- `HistoryPriceItem`: added `from_attributes` + date coercion (DB `Date` objects failed validation)
+- `Report` model: added missing `created_at` column mapping (API referenced it in 3 places)
+- CORS: any-port localhost dev origins via `allow_origin_regex`, extras via `CORS_EXTRA_ORIGINS`
+
+### New features (2026-09-30)
+- **Simplified signup**: only email + password (name derived from email server-side)
+- **Google sign-in**: Firebase Auth — `/auth/google` endpoint verifies Firebase ID tokens against Google JWKS; frontend lazy-loads the Firebase SDK. Configure with `FIREBASE_PROJECT_ID` (backend) + `NEXT_PUBLIC_FIREBASE_*` (frontend). Button shows disabled state until configured.
+- **Ticker autocomplete**: `/market-data/search` endpoint (Yahoo Finance) powering a debounced suggestion dropdown in the Add Holding modal; picking a ticker auto-fetches the live price and pre-fills avg cost
+- **Alpaca broker sync**: connect/disconnect per-user API keys (`broker_connections` table, migration `4a4eb302255b`), live position fetch, one-click sync into any portfolio (merge/replace). UI card on the Overview tab.
+- **Frontend UIs built for Phases 10–12** (previously backend-only): Copilot sidebar with SSE streaming + citations, News Intelligence tab (feed + sentiment cards + refresh), Reports tab (generate/poll/download/delete)
+- **Optimization + Stress Testing nav buttons added** — Phase 8/9 dashboards existed but were unreachable before
+- **OptimizationPanel component**: method selector, weight-constraint sliders, expected metrics, rebalancing trades table
+
+### Known follow-ups
+- Angel One SmartAPI integration (user requested for later; Alpaca shipped first)
+- Firebase project setup is a manual user step (create project → set env vars)
+- `reports` table's `updated_at`/index drift between migration and model is cosmetic
+- Rate-limit middleware (slowapi) still not wired; scheduled for hardening round
+
+---
 
 ---
 

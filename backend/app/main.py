@@ -19,8 +19,24 @@ async def lifespan(app: FastAPI):
     # Startup
     print(f"PortfolioIQ backend starting...")
     print(f"Debug mode: {settings.debug}")
+
+    # Start the news scheduler (Phase 11) unless disabled via env
+    import os as _os
+    if _os.getenv("DISABLE_NEWS_SCHEDULER", "false").lower() != "true":
+        try:
+            from app.services.news.scheduler import init_scheduler, shutdown_scheduler
+            await init_scheduler()
+        except Exception as e:
+            print(f"Warning: news scheduler failed to start: {e}")
+
     yield
+
     # Shutdown
+    try:
+        from app.services.news.scheduler import shutdown_scheduler
+        await shutdown_scheduler()
+    except Exception:
+        pass
     print("PortfolioIQ backend shutting down...")
 
 
@@ -33,13 +49,13 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS
+# CORS — localhost dev origins on any port (Next.js may bind an alternate port),
+# plus configured extras for non-local deployments.
+_extra_origins = [o for o in (settings.cors_extra_origins or "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_origins=_extra_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

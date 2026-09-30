@@ -2,7 +2,7 @@
 
 import asyncio
 from uuid import UUID
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import pandas as pd
 import yfinance as yf
 from fastapi import HTTPException, status
@@ -26,6 +26,7 @@ from app.schemas.market_data import (
 )
 from app.services import cache_service, portfolio_service
 from app.utils.constants import BenchmarkType, CurrencyCode
+from app.utils.ids import to_uuid as _to_uuid
 
 # Fallback exchange rates if API fails
 CURRENCY_FALLBACKS = {
@@ -198,6 +199,8 @@ async def get_portfolio_valuation_series(
     db: AsyncSession, portfolio_id: UUID, user_id: UUID, period: str = "1y"
 ) -> ValuationResponse:
     """Calculate historical portfolio value over time."""
+    portfolio_id = _to_uuid(portfolio_id)
+    user_id = _to_uuid(user_id)
     portfolio = await portfolio_service.get_portfolio_detail(db, portfolio_id, user_id)
 
     # 1. Fetch benchmark timeline to establish trading days
@@ -267,6 +270,8 @@ async def get_portfolio_returns_series(
     db: AsyncSession, portfolio_id: UUID, user_id: UUID, period: str = "1y"
 ) -> ReturnsResponse:
     """Calculate portfolio returns series over time."""
+    portfolio_id = _to_uuid(portfolio_id)
+    user_id = _to_uuid(user_id)
     val_resp = await get_portfolio_valuation_series(db, portfolio_id, user_id, period)
     v_series = val_resp.valuation_series
 
@@ -458,6 +463,43 @@ def _get_benchmark_ticker(benchmark: str | None) -> str:
     elif benchmark == BenchmarkType.SENSEX.value:
         return "^BSESN"
     return "^GSPC"
+
+
+def search_tickers_sync(query: str, limit: int = 8) -> list[dict]:
+    """Search Yahoo Finance for tickers matching a symbol/name fragment.
+
+    Blocking; call from async code via asyncio.to_thread.
+    """
+    import httpx
+
+    try:
+        resp = httpx.get(
+            "https://query2.finance.yahoo.com/v1/finance/search",
+            params={"q": query, "quotesCount": limit, "newsCount": 0, "listsCount": 0},
+            headers={"User-Agent": "Mozilla/5.0 (PortfolioIQ)"},
+            timeout=8.0,
+        )
+        resp.raise_for_status()
+        quotes = resp.json().get("quotes", [])
+    except Exception:
+        return []
+
+    results = []
+    for item in quotes:
+        symbol = (item.get("symbol") or "").strip()
+        if not symbol or item.get("quoteType") not in ("EQUITY", "ETF", "MUTUALFUND"):
+            continue
+        results.append(
+            {
+                "symbol": symbol,
+                "name": item.get("shortname") or item.get("longname") or symbol,
+                "exchange": item.get("exchDisp") or item.get("exchange"),
+                "quote_type": item.get("quoteType"),
+            }
+        )
+        if len(results) >= limit:
+            break
+    return results
 
 
 # ── Local Database Caching Helpers ─────────────────────────────────────

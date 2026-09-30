@@ -27,6 +27,7 @@ from app.schemas.health import (
 )
 from app.services import market_data_service, risk_engine, benchmark_engine
 from app.utils.constants import BENCHMARK_TICKERS, BenchmarkType
+from app.utils.ids import to_uuid as _to_uuid
 
 
 def get_grade_from_score(score: int) -> str:
@@ -47,11 +48,14 @@ async def calculate_portfolio_health(
     db: AsyncSession, portfolio_id: str, user_id: str
 ) -> HealthScoreResponse:
     """Calculate, cache, and return overall portfolio health scores and recommendations."""
-    # 1. Fetch portfolio and holdings
+    portfolio_id = _to_uuid(portfolio_id)
+    user_id = _to_uuid(user_id)
+
+    # 1. Fetch portfolio and holdings (with instruments — avoids lazy-load in async)
     result = await db.execute(
         select(Portfolio)
         .where(and_(Portfolio.id == portfolio_id, Portfolio.user_id == user_id))
-        .options(selectinload(Portfolio.holdings))
+        .options(selectinload(Portfolio.holdings).selectinload(Holding.instrument))
     )
     portfolio = result.scalar_one_or_none()
     if not portfolio:

@@ -19,6 +19,7 @@ from app.schemas.benchmark import (
 from app.schemas.risk import SeriesData
 from app.services import market_data_service, risk_engine
 from app.utils.constants import BENCHMARK_TICKERS, BenchmarkType
+from app.utils.ids import to_uuid as _to_uuid
 
 
 async def calculate_benchmark_comparison(
@@ -29,6 +30,9 @@ async def calculate_benchmark_comparison(
     lookback_days: int = 252,
 ) -> BenchmarkComparisonResponse:
     """Calculate and cache performance comparison metrics against a benchmark."""
+    portfolio_id = _to_uuid(portfolio_id)
+    user_id = _to_uuid(user_id)
+
     # 1. Fetch portfolio details
     result = await db.execute(
         select(Portfolio).where(

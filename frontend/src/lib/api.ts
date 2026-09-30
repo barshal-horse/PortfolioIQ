@@ -2,7 +2,7 @@
  * Zentral API helper layer connecting to FastAPI backend.
  */
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) || 'http://localhost:8000/api/v1';
 
 export interface ApiResponse<T> {
   status: 'success' | 'error';
@@ -176,5 +176,155 @@ export const api = {
     optimize: async (portfolioId: string, body: any) => apiFetch<any>(`/portfolios/${portfolioId}/optimize`, { method: 'POST', body: JSON.stringify(body) }),
     optimizeBlackLitterman: async (portfolioId: string, body: any) => apiFetch<any>(`/portfolios/${portfolioId}/optimize/black-litterman`, { method: 'POST', body: JSON.stringify(body) }),
     getHistory: async (portfolioId: string, limit?: number) => apiFetch<any[]>(`/portfolios/${portfolioId}/optimize/history?limit=${limit || 10}`),
-  }
+  },
+
+  // Copilot (Phase 10)
+  copilot: {
+    createSession: async (portfolioId?: string, title?: string) =>
+      apiFetch<any>('/copilot/sessions', { method: 'POST', body: JSON.stringify({ portfolio_id: portfolioId || null, title }) }),
+    listSessions: async () => apiFetch<any[]>('/copilot/sessions'),
+    getSession: async (sessionId: string) => apiFetch<any>(`/copilot/sessions/${sessionId}`),
+    deleteSession: async (sessionId: string) => apiFetch<any>(`/copilot/sessions/${sessionId}`, { method: 'DELETE' }),
+    getMessages: async (sessionId: string, limit?: number) =>
+      apiFetch<any>(`/copilot/sessions/${sessionId}/messages?limit=${limit || 50}`),
+    sendMessage: async (sessionId: string, content: string) =>
+      apiFetch<any>(`/copilot/sessions/${sessionId}/messages`, { method: 'POST', body: JSON.stringify({ content }) }),
+  },
+
+  // News Intelligence (Phase 11)
+  news: {
+    getPortfolioNews: async (portfolioId: string, days?: number, limit?: number) =>
+      apiFetch<any[]>(`/news/portfolio/${portfolioId}?days=${days || 7}&limit=${limit || 50}`),
+    getTickerNews: async (ticker: string, days?: number, limit?: number) =>
+      apiFetch<any[]>(`/news/ticker/${ticker}?days=${days || 7}&limit=${limit || 20}`),
+    refreshPortfolioNews: async (portfolioId: string, days?: number) =>
+      apiFetch<any>(`/news/portfolio/${portfolioId}/refresh?days=${days || 7}`, { method: 'POST' }),
+    getTickerSentiment: async (ticker: string, days?: number) =>
+      apiFetch<any>(`/news/sentiment/ticker/${ticker}?days=${days || 7}`),
+    getPortfolioSentiment: async (portfolioId: string, days?: number) =>
+      apiFetch<any[]>(`/news/sentiment/portfolio/${portfolioId}?days=${days || 7}`),
+    processSentiment: async (limit?: number) =>
+      apiFetch<any>(`/news/sentiment/process?limit=${limit || 100}`, { method: 'POST' }),
+    getEarningsCalendar: async (portfolioId: string, daysAhead?: number) =>
+      apiFetch<any[]>(`/news/earnings/portfolio/${portfolioId}?days_ahead=${daysAhead || 30}`),
+  },
+
+  // Reports (Phase 12)
+  reports: {
+    generate: async (portfolioId: string, reportType: string, parameters?: any) =>
+      apiFetch<any>(`/reports/generate?portfolio_id=${portfolioId}`, { method: 'POST', body: JSON.stringify({ report_type: reportType, parameters: parameters || {} }) }),
+    list: async (portfolioId?: string, statusFilter?: string) => {
+      const params = new URLSearchParams();
+      if (portfolioId) params.set('portfolio_id', portfolioId);
+      if (statusFilter) params.set('status_filter', statusFilter);
+      const qs = params.toString();
+      return apiFetch<any[]>(`/reports${qs ? `?${qs}` : ''}`);
+    },
+    get: async (reportId: string) => apiFetch<any>(`/reports/${reportId}`),
+    getStatus: async (reportId: string) => apiFetch<any>(`/reports/${reportId}/status`),
+    delete: async (reportId: string) => apiFetch<any>(`/reports/${reportId}`, { method: 'DELETE' }),
+    // Authenticated download — returns object URL for the PDF blob
+    download: async (reportId: string): Promise<string> => {
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE_URL}/reports/${reportId}/download`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.detail || `Download failed (${response.status})`);
+      }
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
+    },
+  },
+
+  // Broker Sync (Alpaca)
+  broker: {
+    getStatus: async () => apiFetch<any>('/broker/status'),
+    connect: async (apiKey: string, apiSecret: string) =>
+      apiFetch<any>('/broker/connect', { method: 'POST', body: JSON.stringify({ api_key: apiKey, api_secret: apiSecret }) }),
+    disconnect: async () => apiFetch<any>('/broker/disconnect', { method: 'POST' }),
+    getPositions: async () => apiFetch<any[]>('/broker/positions'),
+    getAccount: async () => apiFetch<any>('/broker/account'),
+    syncToPortfolio: async (portfolioId: string, mode: 'merge' | 'replace') =>
+      apiFetch<any>(`/broker/sync/${portfolioId}?mode=${mode}`, { method: 'POST' }),
+  },
+
+  // Ticker Search (autocomplete)
+  search: {
+    tickers: async (query: string, limit?: number) =>
+      apiFetch<any[]>(`/market-data/search?q=${encodeURIComponent(query)}&limit=${limit || 8}`),
+    getQuote: async (ticker: string) => apiFetch<any>(`/market-data/quote/${ticker}`),
+  },
 };
+
+/**
+ * Stream a Copilot response via SSE. Returns an unsubscribe function.
+ * Events: {type: 'token'|'citation'|'done'|'error', ...}
+ */
+export function streamCopilotMessage(
+  sessionId: string,
+  content: string,
+  handlers: {
+    onToken?: (chunk: string) => void;
+    onCitation?: (citation: any) => void;
+    onDone?: (messageId: string) => void;
+    onError?: (message: string) => void;
+  }
+): () => void {
+  const controller = new AbortController();
+
+  (async () => {
+    try {
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE_URL}/copilot/sessions/${sessionId}/messages/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ content }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok || !response.body) {
+        handlers.onError?.(`Stream failed (${response.status})`);
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // SSE frames are separated by double newlines
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() || '';
+        for (const frame of frames) {
+          const line = frame.split('\n').find((l) => l.startsWith('data: '));
+          if (!line) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === 'token') handlers.onToken?.(event.content);
+            else if (event.type === 'citation') handlers.onCitation?.(event.citation);
+            else if (event.type === 'done') handlers.onDone?.(event.message_id);
+            else if (event.type === 'error') handlers.onError?.(event.message);
+          } catch {
+            // ignore malformed frame
+          }
+        }
+      }
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        handlers.onError?.(err?.message || 'Stream failed');
+      }
+    }
+  })();
+
+  return () => controller.abort();
+}
+

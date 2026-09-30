@@ -7,12 +7,19 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class UserRegister(BaseModel):
-    """Request body for user registration."""
+    """Request body for user registration — only the essentials."""
 
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    full_name: str = Field(min_length=2, max_length=255)
+    # Optional extras — derived from email if omitted
+    full_name: str | None = Field(default=None, max_length=255)
     base_currency: str = Field(default="USD", pattern=r"^(USD|INR|EUR|GBP)$")
+
+
+class GoogleAuthRequest(BaseModel):
+    """Request body for Google sign-in via Firebase."""
+
+    id_token: str = Field(min_length=20, description="Firebase ID token from the client SDK")
 
 
 class UserLogin(BaseModel):

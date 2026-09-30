@@ -13,6 +13,7 @@ from app.models.instrument import Instrument
 from app.models.portfolio import Portfolio
 from app.schemas.holding import BulkHoldingItem, HoldingCreate, HoldingUpdate
 from app.schemas.portfolio import PortfolioCreate, PortfolioUpdate, SectorAllocation
+from app.utils.ids import to_uuid as _to_uuid
 
 
 # ── Portfolio CRUD ────────────────────────────────────────────────────────
@@ -84,6 +85,8 @@ async def get_portfolio_detail(
     db: AsyncSession, portfolio_id: UUID, user_id: UUID
 ) -> Portfolio:
     """Get a portfolio with its holdings eagerly loaded."""
+    portfolio_id = _to_uuid(portfolio_id)
+    user_id = _to_uuid(user_id)
     result = await db.execute(
         select(Portfolio)
         .options(selectinload(Portfolio.holdings).selectinload(Holding.instrument))

@@ -1,8 +1,8 @@
 """Market data schemas — quote, history, portfolio valuation, returns, benchmarks."""
 
-from datetime import datetime
+from datetime import date as date_type, datetime
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class QuoteResponse(BaseModel):
@@ -26,6 +26,8 @@ class QuoteResponse(BaseModel):
 class HistoryPriceItem(BaseModel):
     """Single historical price data point."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     date: str  # YYYY-MM-DD
     open: float | None = None
     high: float | None = None
@@ -33,6 +35,14 @@ class HistoryPriceItem(BaseModel):
     close: float
     adj_close: float
     volume: int | None = None
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def _coerce_date(cls, v):
+        """Accept date objects from the DB (Date column) as well as strings."""
+        if isinstance(v, date_type):
+            return v.isoformat()
+        return v
 
 
 class HistoryResponse(BaseModel):

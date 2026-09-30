@@ -12,6 +12,10 @@ from app.api.benchmark import router as benchmark_comparison_router
 from app.api.health import router as health_router
 from app.api.optimization import router as optimization_router
 from app.api.stress_testing import router as stress_testing_router
+from app.api.copilot import router as copilot_router
+from app.api.news import router as news_router
+from app.api.reports import router as reports_router
+from app.api.broker import router as broker_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -25,8 +29,7 @@ api_router.include_router(benchmark_comparison_router)
 api_router.include_router(health_router)
 api_router.include_router(optimization_router)
 api_router.include_router(stress_testing_router)
-
-# Future phases will add:
-# api_router.include_router(copilot_router)
-# api_router.include_router(news_router)
-# api_router.include_router(reports_router)
+api_router.include_router(copilot_router)
+api_router.include_router(news_router)
+api_router.include_router(reports_router)
+api_router.include_router(broker_router)
