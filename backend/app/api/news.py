@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 
 
 class NewsArticleResponse(BaseModel):
-    id: str
+    id: UUID
     source: str
     title: str
     summary: Optional[str]
@@ -40,8 +40,8 @@ class NewsArticleResponse(BaseModel):
 
 
 class SentimentScoreResponse(BaseModel):
-    id: str
-    article_id: str
+    id: UUID
+    article_id: UUID
     ticker: Optional[str]
     sentiment: str
     confidence: float

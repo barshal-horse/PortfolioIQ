@@ -2,6 +2,7 @@
 
 import asyncio
 import hashlib
+import re
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from uuid import UUID
@@ -14,6 +15,12 @@ from app.config import get_settings
 from app.models.news import NewsArticle, SentimentScore
 from app.models.portfolio import Portfolio
 from app.models.holding import Holding
+
+# Injected by fetch_and_store_portfolio_news so _extract_tickers can tag
+# articles with the portfolio's own tickers (incl. non-US / uncommon symbols).
+# Injected by fetch_and_store_portfolio_news so _extract_tickers can tag
+# articles with the portfolio's own tickers (incl. non-US / uncommon symbols).
+_pending_tickers: set[str] = set()
 from app.utils.ids import to_uuid as _to_uuid
 
 
@@ -181,10 +188,25 @@ class NewsService:
         return datetime.now(timezone.utc)
 
     def _extract_tickers(self, article: Dict) -> List[str]:
-        """Extract ticker symbols from article."""
-        # This is a simple extraction - in production, use NLP
+        """Extract ticker symbols from article.
+
+        In addition to the hard-coded common-ticker list, tag articles with
+        any of the current fetch's portfolio tickers found in the text so
+        portfolio-scoped news queries (related_tickers.contains) can match.
+        """
         tickers = set()
         text = f"{article.get('title', '')} {article.get('summary', '')} {article.get('description', '')}".upper()
+
+        hint = article.get("_portfolio_ticker")
+        if hint:
+            tickers.add(str(hint).upper())
+
+        # Finnhub company-news items carry an explicit "related" list
+        # (e.g. [{"symbol": "AAP"}, ...]) — trust it when present.
+        for rel in article.get("related") or []:
+            symbol = rel.get("symbol") if isinstance(rel, dict) else rel
+            if symbol:
+                tickers.add(str(symbol).upper())
 
         # Common tickers - in production, match against known tickers
         common_tickers = [
@@ -195,6 +217,12 @@ class NewsService:
 
         for ticker in common_tickers:
             if ticker in text:
+                tickers.add(ticker)
+
+        # Also match the portfolio's own tickers (word-boundary regex so short
+        # symbols like "V" don't match inside unrelated words).
+        for ticker in _pending_tickers:
+            if re.search(rf"\b{re.escape(ticker)}\b", text):
                 tickers.add(ticker)
 
         return list(tickers)
@@ -230,12 +258,37 @@ class NewsService:
         stored_count = 0
         fetched_count = 0
 
+        # Let _extract_tickers tag fetched articles with these tickers so the
+        # portfolio news feed (related_tickers filter) can find them.
+        global _pending_tickers
+        _pending_tickers = {t.upper() for t in tickers}
+
+        try:
+            stored_count, fetched_count = await self._fetch_articles_for_tickers(
+                db, tickers, days
+            )
+        finally:
+            _pending_tickers = set()
+
+        await db.commit()
+        return {"fetched": fetched_count, "stored": stored_count, "tickers": tickers}
+
+    async def _fetch_articles_for_tickers(
+        self, db: AsyncSession, tickers: List[str], days: int
+    ) -> tuple[int, int]:
+        """Fetch company + general + NewsAPI articles for the given tickers."""
+        stored_count = 0
+        fetched_count = 0
+
         # Fetch from Finnhub (company news)
         for ticker in tickers:
             articles = await self.fetch_finnhub_company_news(ticker, days)
             fetched_count += len(articles)
 
             for article in articles:
+                # These came from this ticker's company feed — tag them
+                # unconditionally so the portfolio feed can match them.
+                article["_portfolio_ticker"] = ticker.upper()
                 stored = await self._store_article(db, article, "finnhub")
                 if stored:
                     stored_count += 1
@@ -260,8 +313,7 @@ class NewsService:
                 if stored:
                     stored_count += 1
 
-        await db.commit()
-        return {"fetched": fetched_count, "stored": stored_count, "tickers": tickers}
+        return stored_count, fetched_count
 
     async def get_portfolio_news(
         self,
@@ -290,8 +342,17 @@ class NewsService:
         # Get articles related to portfolio tickers
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
-        # Build query for articles with related tickers
-        ticker_conditions = [NewsArticle.related_tickers.contains([t]) for t in tickers]
+        # Build query for articles with related tickers.
+        # JSON column .contains() compiles to a literal JSON-text LIKE on
+        # SQLite ('%["AAP"]%' — spacing-sensitive, effectively useless), so
+        # match the quoted token instead: LIKE '%"AAP"%'. On Postgres this
+        # binds a plain string into the JSONB @> operator, which means
+        # 'top-level string element' — also correct for our list-of-strings
+        # column.
+        ticker_conditions = [
+            NewsArticle.related_tickers.contains(f'"{t.upper()}"')
+            for t in tickers
+        ]
 
         query = (
             select(NewsArticle)

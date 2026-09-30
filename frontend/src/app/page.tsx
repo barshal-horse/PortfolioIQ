@@ -387,13 +387,20 @@ export default function DashboardPage() {
     return `${(val * 100).toFixed(2)}%`;
   };
 
-  // Convert sector allocations to chart data format
-  const sectorChartData = portfolioDetails?.sector_allocation
-    ? Object.keys(portfolioDetails.sector_allocation).map((key) => ({
-        name: key,
-        value: portfolioDetails.sector_allocation[key]
-      }))
-    : [];
+  // Convert sector allocations to chart data format.
+  // API returns an array of { sector, weight, value } (weight as a fraction).
+  const sectorChartData: { name: string; value: number }[] = (
+    (portfolioDetails?.sector_allocation ?? []) as Array<{
+      sector?: string;
+      name?: string;
+      weight?: number;
+    }>
+  )
+    .map((s) => ({
+      name: s?.sector ?? s?.name ?? "Unknown",
+      value: Number(s?.weight ?? 0),
+    }))
+    .filter((s) => Number.isFinite(s.value) && s.value > 0);
 
   // Valuation growth series
   const valuationChartData = riskData?.return_series?.dates?.map((d: string, idx: number) => {
