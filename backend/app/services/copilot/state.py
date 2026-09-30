@@ -48,3 +48,8 @@ class CopilotState(TypedDict):
     should_continue: bool
     iteration_count: int
     max_iterations: int
+
+    # UI hint: set when the request failed purely because no Gemini key is
+    # configured (user or server). The API layer surfaces it so the frontend
+    # can offer the key-connect form.
+    needs_gemini_key: bool

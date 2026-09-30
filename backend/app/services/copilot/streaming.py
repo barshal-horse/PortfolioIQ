@@ -67,8 +67,8 @@ async def stream_copilot_response(
         for citation in citations:
             yield f"data: {json.dumps({'type': 'citation', 'citation': citation})}\n\n"
         
-        # Send done event
-        yield f"data: {json.dumps({'type': 'done', 'message_id': 'msg-' + str(abs(hash(final_response)))})}\n\n"
+        # Send done event (+ needs_gemini_key hint for the UI)
+        yield f"data: {json.dumps({'type': 'done', 'message_id': 'msg-' + str(abs(hash(final_response))), 'needs_gemini_key': bool(result.get('needs_gemini_key', False))})}\n\n"
         
     except Exception as e:
         yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
@@ -108,6 +108,7 @@ async def run_copilot_sync(
     # Add assistant response to history
     final_response = result.get("final_response", "")
     citations = result.get("citations", [])
+    needs_gemini_key = bool(result.get("needs_gemini_key", False))
     tool_calls = []
     for r in result.get("agent_results", []):
         tool_calls.extend(r.get("tool_calls", []))
@@ -125,4 +126,5 @@ async def run_copilot_sync(
         "citations": citations,
         "tool_calls": tool_calls,
         "guardrail_flags": result.get("guardrail_flags", []),
+        "needs_gemini_key": needs_gemini_key,
     }

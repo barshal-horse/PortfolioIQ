@@ -7,9 +7,7 @@ from google.genai import types
 
 from app.config import get_settings
 from app.services.copilot.state import CopilotState, AgentResult
-
-# Initialize Gemini client
-client = genai.Client(api_key=get_settings().gemini_api_key) if get_settings().gemini_api_key else None
+from app.services.copilot.gemini_client import resolve_gemini_client
 
 SYNTHESIZER_PROMPT = """You are the PortfolioIQ Response Synthesizer. You receive analysis
 results from one or more specialized agents and must create a unified, coherent response.
@@ -36,6 +34,7 @@ Original user question:
 
 async def response_synthesizer(state: CopilotState) -> CopilotState:
     """Synthesize multiple agent responses into a unified answer."""
+    client, _source = await resolve_gemini_client(state.get("user_id"))
     
     if not client:
         # Simple fallback: concatenate agent results
@@ -51,6 +50,7 @@ async def response_synthesizer(state: CopilotState) -> CopilotState:
                 c for r in state.get("agent_results", []) 
                 for c in r.get("citations", [])
             ],
+            "needs_gemini_key": True,
         }
     
     # Get the user's original query

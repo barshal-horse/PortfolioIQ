@@ -16,6 +16,7 @@ from app.api.copilot import router as copilot_router
 from app.api.news import router as news_router
 from app.api.reports import router as reports_router
 from app.api.broker import router as broker_router
+from app.api.settings import router as settings_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -33,3 +34,4 @@ api_router.include_router(copilot_router)
 api_router.include_router(news_router)
 api_router.include_router(reports_router)
 api_router.include_router(broker_router)
+api_router.include_router(settings_router)

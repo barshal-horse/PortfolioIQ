@@ -13,6 +13,8 @@ import {
   ChevronUp,
   AlertCircle,
   Wrench,
+  KeyRound,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface ChatMessage {
@@ -44,8 +46,22 @@ export default function CopilotSidebar({ portfolioId, onClose }: CopilotSidebarP
   const [error, setError] = useState<string | null>(null);
   const [showSessions, setShowSessions] = useState(false);
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
+  const [geminiSource, setGeminiSource] = useState<'user' | 'server' | 'none' | null>(null);
+  const [showKeyForm, setShowKeyForm] = useState(false);
+  const [keyInput, setKeyInput] = useState('');
+  const [keySaving, setKeySaving] = useState(false);
+  const [keyMsg, setKeyMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const loadGeminiStatus = useCallback(async () => {
+    try {
+      const st = await api.settings.getGeminiStatus();
+      setGeminiSource(st?.source ?? 'none');
+    } catch {
+      setGeminiSource(null);
+    }
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -55,9 +71,10 @@ export default function CopilotSidebar({ portfolioId, onClose }: CopilotSidebarP
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Load sessions on mount
+  // Load sessions + Gemini key status on mount
   useEffect(() => {
     loadSessions();
+    loadGeminiStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -176,6 +193,10 @@ export default function CopilotSidebar({ portfolioId, onClose }: CopilotSidebarP
         setSending(false);
         loadSessions();
       },
+      onNeedsKey: () => {
+        setGeminiSource('none');
+        setShowKeyForm(true);
+      },
       onError: (message) => {
         streamError = message;
         setMessages((prev) =>
@@ -214,6 +235,36 @@ export default function CopilotSidebar({ portfolioId, onClose }: CopilotSidebarP
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  const handleSaveKey = async () => {
+    const key = keyInput.trim();
+    if (!key || keySaving) return;
+    setKeySaving(true);
+    setKeyMsg(null);
+    try {
+      await api.settings.saveGeminiKey(key);
+      setGeminiSource('user');
+      setShowKeyForm(false);
+      setKeyInput('');
+      setKeyMsg({ ok: true, text: 'Gemini key connected — ask away!' });
+      setError(null);
+    } catch (err: any) {
+      const detail = err?.message || 'Failed to save key';
+      setKeyMsg({ ok: false, text: detail });
+    } finally {
+      setKeySaving(false);
+    }
+  };
+
+  const handleRemoveKey = async () => {
+    try {
+      await api.settings.deleteGeminiKey();
+      setGeminiSource('none');
+      setKeyMsg({ ok: true, text: 'Gemini key removed.' });
+    } catch (err: any) {
+      setKeyMsg({ ok: false, text: err?.message || 'Failed to remove key' });
     }
   };
 
@@ -287,6 +338,89 @@ export default function CopilotSidebar({ portfolioId, onClose }: CopilotSidebarP
           )}
         </div>
       )}
+
+      {/* Gemini key status / connect form */}
+      <div className="px-4 py-2.5 border-b border-brand-border">
+        {geminiSource === 'none' && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-1.5 text-[11px] text-amber-400">
+              <AlertCircle className="h-3.5 w-3.5" />
+              <span>No Gemini key — copilot is offline</span>
+            </div>
+            <button
+              onClick={() => { setShowKeyForm((s) => !s); setKeyMsg(null); }}
+              className="flex items-center space-x-1 text-[11px] font-semibold text-brand-cyan hover:text-brand-cyan/80 cursor-pointer"
+            >
+              <KeyRound className="h-3 w-3" />
+              Connect
+            </button>
+          </div>
+        )}
+        {geminiSource === 'user' && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-1.5 text-[11px] text-emerald-400">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span>Gemini connected (your key)</span>
+            </div>
+            <button
+              onClick={handleRemoveKey}
+              className="text-[10px] text-slate-500 hover:text-brand-red cursor-pointer"
+            >
+              Remove
+            </button>
+          </div>
+        )}
+        {geminiSource === 'server' && (
+          <div className="flex items-center space-x-1.5 text-[11px] text-emerald-400">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <span>Gemini connected (server key)</span>
+          </div>
+        )}
+        {showKeyForm && (
+          <div className="mt-2.5 space-y-2">
+            <input
+              type="password"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveKey(); }}
+              placeholder="Paste Gemini API key (AIza...)"
+              className="w-full bg-brand-bg/60 border border-brand-border rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-cyan"
+              autoFocus
+            />
+            <div className="flex items-center justify-between">
+              <a
+                href="https://aistudio.google.com/apikey"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[10px] text-slate-500 hover:text-slate-300 underline"
+              >
+                Get a free key →
+              </a>
+              <div className="space-x-2">
+                <button
+                  onClick={() => { setShowKeyForm(false); setKeyInput(''); setKeyMsg(null); }}
+                  className="text-[11px] text-slate-400 hover:text-slate-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveKey}
+                  disabled={!keyInput.trim() || keySaving}
+                  className="px-2.5 py-1 text-[11px] font-semibold bg-gradient-to-br from-brand-cyan to-brand-violet text-slate-100 rounded-lg disabled:opacity-40 cursor-pointer"
+                >
+                  {keySaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+            {keyMsg && !keyMsg.ok && (
+              <p className="text-[10px] text-brand-red">{keyMsg.text}</p>
+            )}
+          </div>
+        )}
+        {keyMsg?.ok && !showKeyForm && (
+          <p className="text-[10px] text-emerald-400 mt-1">{keyMsg.text}</p>
+        )}
+      </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">

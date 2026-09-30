@@ -62,3 +62,4 @@ from app.models.health_score import HealthScore  # noqa: E402, F401
 from app.models.optimization_run import OptimizationRun  # noqa: E402, F401
 from app.models.stress_test_result import StressTestResult  # noqa: E402, F401
 from app.models.broker import BrokerConnection  # noqa: E402, F401
+from app.models.api_key import ApiKeySetting  # noqa: E402, F401

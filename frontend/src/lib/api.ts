@@ -256,6 +256,14 @@ export const api = {
       apiFetch<any[]>(`/market-data/search?q=${encodeURIComponent(query)}&limit=${limit || 8}`),
     getQuote: async (ticker: string) => apiFetch<any>(`/market-data/quote/${ticker}`),
   },
+
+  // Per-user API keys (Gemini, etc.)
+  settings: {
+    getGeminiStatus: async () => apiFetch<{ provider: string; configured: boolean; source: 'user' | 'server' | 'none' }>('/settings/api-keys/gemini'),
+    saveGeminiKey: async (key: string) =>
+      apiFetch<{ provider: string; configured: boolean; source: string }>('/settings/api-keys', { method: 'POST', body: JSON.stringify({ provider: 'gemini', key }) }),
+    deleteGeminiKey: async () => apiFetch<{ provider: string; deleted: boolean }>('/settings/api-keys/gemini', { method: 'DELETE' }),
+  },
 };
 
 /**
@@ -270,6 +278,7 @@ export function streamCopilotMessage(
     onCitation?: (citation: any) => void;
     onDone?: (messageId: string) => void;
     onError?: (message: string) => void;
+    onNeedsKey?: () => void;
   }
 ): () => void {
   const controller = new AbortController();
@@ -311,7 +320,10 @@ export function streamCopilotMessage(
             const event = JSON.parse(line.slice(6));
             if (event.type === 'token') handlers.onToken?.(event.content);
             else if (event.type === 'citation') handlers.onCitation?.(event.citation);
-            else if (event.type === 'done') handlers.onDone?.(event.message_id);
+            else if (event.type === 'done') {
+              if (event.needs_gemini_key) handlers.onNeedsKey?.();
+              handlers.onDone?.(event.message_id);
+            }
             else if (event.type === 'error') handlers.onError?.(event.message);
           } catch {
             // ignore malformed frame

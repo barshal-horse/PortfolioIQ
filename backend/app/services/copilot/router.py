@@ -7,10 +7,7 @@ from google.genai import types
 
 from app.config import get_settings
 from app.services.copilot.state import CopilotState
-
-# Initialize Gemini client
-_settings = get_settings()
-client = genai.Client(api_key=_settings.gemini_api_key) if _settings.gemini_api_key else None
+from app.services.copilot.gemini_client import resolve_gemini_client
 
 # Agent registry — must match the agents actually registered in the LangGraph.
 # Keep in sync with AGENTS in app.services.copilot.agents
@@ -78,6 +75,7 @@ ROUTER_GENERATION_CONFIG = {
 
 async def copilot_router(state: CopilotState) -> CopilotState:
     """Route user query to appropriate agents."""
+    client, _key_source = await resolve_gemini_client(state.get("user_id"))
     if not client:
         return {
             **state,
@@ -86,6 +84,7 @@ async def copilot_router(state: CopilotState) -> CopilotState:
             "routing_reasoning": "Gemini API key not configured",
             "error": "LLM not configured",
             "should_continue": False,
+            "needs_gemini_key": True,
         }
 
     # Get the last user message

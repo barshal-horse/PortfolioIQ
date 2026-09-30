@@ -48,6 +48,7 @@ class MessageResponse(BaseModel):
     citations: List[dict]
     tool_calls: List[dict]
     guardrail_flags: List[str]
+    needs_gemini_key: bool = False
 
 
 class SessionMessagesResponse(BaseModel):
@@ -133,6 +134,16 @@ async def send_message(
     )
     
     return SuccessResponse(data=MessageResponse(**result))
+
+
+@router.get("/gemini-status", response_model=SuccessResponse[dict])
+async def copilot_gemini_status(
+    current_user: User = Depends(get_current_user),
+):
+    """Whether the copilot has a Gemini key (user-stored or server env)."""
+    from app.services.copilot.gemini_client import resolve_gemini_client
+    client, source = await resolve_gemini_client(current_user.id)
+    return SuccessResponse(data={"configured": client is not None, "source": source})
 
 
 @router.post(

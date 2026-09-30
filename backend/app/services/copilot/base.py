@@ -61,7 +61,8 @@ class BaseAgent(ABC):
     
     async def _call_llm(self, prompt: str, tools: Optional[List[BaseTool]] = None) -> Dict[str, Any]:
         """Call Gemini LLM with tool calling support."""
-        if not self.client:
+        client = getattr(self, "_effective_client", None) or self.client
+        if not client:
             return {"text": "LLM not configured", "tool_calls": []}
         
         # Convert tools to Gemini format
@@ -87,7 +88,7 @@ class BaseAgent(ABC):
             ) if gemini_tools else None,
         )
         
-        response = self.client.models.generate_content(
+        response = client.models.generate_content(
             model=self.MODEL,
             contents=[types.Content(role="user", parts=[types.Part(text=prompt)])],
             config=config,
@@ -182,12 +183,17 @@ class BaseAgent(ABC):
     
     async def execute(self, state: CopilotState) -> CopilotState:
         """Execute the agent and return updated state."""
-        if not self.client:
+        # Per-request key resolution: user-stored key > server env key.
+        from app.services.copilot.gemini_client import resolve_gemini_client
+        client, _source = await resolve_gemini_client(state.get("user_id"))
+        self._effective_client = client
+
+        if not client:
             return {
                 **state,
                 "agent_results": state["agent_results"] + [AgentResult(
                     agent_name=self.name,
-                    content="LLM not configured (missing GEMINI_API_KEY)",
+                    content="LLM not configured (no Gemini API key)",
                     citations=[],
                     tool_calls=[],
                     confidence=0.0,
@@ -195,6 +201,7 @@ class BaseAgent(ABC):
                 )],
                 "agents_completed": state["agents_completed"] + [self.name],
                 "current_agent": None,
+                "needs_gemini_key": True,
             }
         
         # Update state
